@@ -1,4 +1,7 @@
 library(igraph)
+library(RColorBrewer)
+
+
 
 # Funtion to generate a specific random graph
 generate_graph <- function(selection, number_of_nodes, probability = 0.01){
@@ -91,4 +94,18 @@ producers_list <- function(population, products){
   }
   
   return(producers)
+}
+
+
+
+# Function that plot the population graph according by products bought
+plot_population <- function(population, products, layout_P){
+  
+  coul  <- brewer.pal(length(products), "Set1")
+  my_color <- coul[as.numeric(as.factor(V(population)$product))]
+  my_shape <-  ifelse(V(population)$class == "C", "circle", "square")
+
+  plot(population, vertex.shape = my_shape, vertex.color=my_color, layout = layout_P)
+  legend("bottomleft", legend=levels(as.factor(products))  , col = coul , bty = "n", pch=20 , pt.cex = 3, cex = 1.5, text.col=coul , horiz = FALSE, inset = c(-0.1, -0.1))
+  
 }
