@@ -7,10 +7,12 @@ source("mm_lib.R")
 n <- 50
 products <- c("coca", "fanta", "pepsi", "sprite")
 
+time_max <- 10
+
 
 # Create the initial random graph with Clients and Producers
 population <- init_population(n, products)
-producers <- producers_list(population, products)
+producers <- list_producers(population, products)
 layout_P = layout_with_fr(population)
 
 # Assign initial preferences
@@ -35,7 +37,7 @@ for(c in clients_ids){
   }
 }
 
-
+preferences <- market_simulation(population, products, preferences, prices, time_max)
 plot_population(population, products, layout_P)
 
 

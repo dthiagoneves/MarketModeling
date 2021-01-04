@@ -74,7 +74,7 @@ init_population <- function(n, products){
 
 
 # Return a list of lists with the index of each producers
-producers_list <- function(population, products){
+list_producers <- function(population, products){
   Np <- length(products)
   
   producers <- list()
@@ -96,6 +96,45 @@ producers_list <- function(population, products){
   return(producers)
 }
 
+market_simulation <- function(population, products, preferences, prices, time_max){
+  for (t in 1:time_max){
+    print(preferences[,50])
+    preferences <- update_preferences(population, Np, Na, preferences, prices, producers_list, products)
+  }
+  return(preferences)
+}
+
+update_preferences <- function(population, Np, Na, preferences, prices, producers_list, products){
+  distance_coefficient <- 1;
+  adjacent_list <- as_adj_list(population)
+  consumers <- which(V(population)$class == "C")
+  for(a in consumers){
+    
+    local_price <- rep(0L, Np)
+
+    for(p in 1:Np){
+      d <- distances(population, v = a)[1,unlist(producers[[p]])]
+      local_price[p] <- prices[p] + d*distance_coefficient
+    }
+    
+    Nv <- length(adjacent_list[[a]])
+    
+    for(p in 1:Np){
+      #voisins_p <- V(population)[V(population)[adjacent_list[[a]]]$product == products[p] ]
+      sum_aux <- 0
+      for(v in adjacent_list[[a]]){
+        if (V(population)[v]$product == products[p]){
+          sum_aux <- sum_aux + 1
+        }
+      }
+      preferences[p,a] <- preferences[p,a] + ( 1/Np - local_price[p]/sum(local_price) ) + ( (Np-1)/Np - sum_aux/Nv )
+    }
+  }
+  
+  
+  
+  return(preferences)
+}
 
 
 # Function that plot the population graph according by products bought
