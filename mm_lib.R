@@ -97,17 +97,36 @@ list_producers <- function(population, products){
 }
 
 market_simulation <- function(population, products, preferences, prices, time_max){
+  print(preferences[,50])
   for (t in 1:time_max){
-    print(preferences[,50])
     preferences <- update_preferences(population, Np, Na, preferences, prices, producers_list, products)
+    
+    # debug preferences function:
+    message("PREFERENCES N 50 at t = : ", t, "\n")
+    print(preferences[,50])
+    print(sum(preferences[,50]))
+    message("\n\n")
+    
+    # Updating Product Preferences
+    # (The one with most preference)
+    adjacent_list <- as_adj_list(population)
+    consumers <- which(V(population)$class == "C")
+    
+    for(a in consumers){
+      p_preference_aux <- max(preferences[,a])
+      index_aux <- which(preferences[,a] == p_preference_aux)[[1]]
+      V(population)[a]$product <- products[index_aux]
+    }
+    
   }
   return(preferences)
 }
 
 update_preferences <- function(population, Np, Na, preferences, prices, producers_list, products){
-  distance_coefficient <- 1;
   adjacent_list <- as_adj_list(population)
   consumers <- which(V(population)$class == "C")
+  
+  distance_coefficient <- 1;
   for(a in consumers){
     
     local_price <- rep(0L, Np)
@@ -127,10 +146,23 @@ update_preferences <- function(population, Np, Na, preferences, prices, producer
           sum_aux <- sum_aux + 1
         }
       }
-      preferences[p,a] <- preferences[p,a] + ( 1/Np - local_price[p]/sum(local_price) ) + ( (Np-1)/Np - sum_aux/Nv )
+      message("Consumer ", a, "\nProduct ", p)
+      #message("Preferences Before ", preferences[p,a])
+      
+      sum_lp = sum(local_price)
+      #preferences[p,a] <- preferences[p,a] + (( 1/Np - local_price[p]/sum_lp ) + ( (Np-1)/Np - sum_aux/Nv ))
+      #preferences[p,a] <- preferences[p,a] + ( 1/Np - local_price[p]/sum_lp )# + ( (Np-1)/Np - sum_aux/Nv )
+      preferences[p,a] <- preferences[p,a] + ( 1/Np - sum_aux/Nv )
+      print(1/Np - sum_aux/Nv)
+      #message("Preferences After ", preferences[p,a])
+      #message("Np ", Np)
+      #message("Local Price ",local_price[p])
+      #message("Sum Local Price ", sum_local_price)
+      #message("Sum_aux ", sum_aux)
+      #message("Nv ", Nv)
+      #message("\n\n")
     }
   }
-  
   
   
   return(preferences)
