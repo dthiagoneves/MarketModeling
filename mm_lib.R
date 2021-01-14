@@ -97,29 +97,99 @@ list_producers <- function(population, products){
 }
 
 market_simulation <- function(population, products, preferences, prices, time_max){
-  print(preferences[,50])
-  for (t in 1:time_max){
+  
+  Np <- length(products)
+  k_prices <- 1
+  
+  prices_matrix <- matrix(0L, time_max, Np)
+  prices_matrix[1:2,] <- prices
+  sales_matrix <- matrix(0L, time_max, Np)
+  for(p in 1:Np){
+    clients_p <- which(V(population)$product == products[p])
+    sales_matrix[1,p] <- length(clients_p)
+  }
+  
+  #print(preferences[,50])
+  for (t in 2:time_max){
     preferences <- update_preferences(population, Np, Na, preferences, prices, producers_list, products)
     
     # debug preferences function:
-    message("PREFERENCES N 50 at t = : ", t, "\n")
-    print(preferences[,50])
-    print(sum(preferences[,50]))
-    message("\n\n")
+    #message("PREFERENCES N 50 at t = : ", t, "\n")
+    #print(preferences[,50])
+    #print(V(population)[50]$product)
+    #message("\n\n")
     
     # Updating Product Preferences
     # (The one with most preference)
-    adjacent_list <- as_adj_list(population)
-    consumers <- which(V(population)$class == "C")
     
-    for(a in consumers){
-      p_preference_aux <- max(preferences[,a])
-      index_aux <- which(preferences[,a] == p_preference_aux)[[1]]
-      V(population)[a]$product <- products[index_aux]
+    population <- product_choise(population, preferences, products)
+    
+    # Update Sales
+    for(p in 1:Np){
+      clients_p <- which(V(population)$product == products[p])
+      sales_matrix[t,p] <- length(clients_p)
     }
     
+    # Update prices
+    for(p in 1:Np){
+      prices[p] <- prices[p] + k_prices * (sales_matrix[t-1]*prices_matrix[t-1] - sales_matrix[t]*prices_matrix[t]) / (sales_matrix[t]*prices_matrix[t])
+    }
+    if(t < time_max){
+      prices_matrix[t+1,] <- prices
+    }
+    #message("Prices: ")
+    #print(prices)
+    
   }
+  
+  coul  <- brewer.pal(Np, "Paired")
+  
+  # Prices
+  plot(1:time_max, prices_matrix[,1], col = coul[1], type = "l", ylim = c(min(prices_matrix)-1, max(prices_matrix)+1), xlim = c(1, time_max))
+  for(p in 2:Np){
+    lines(1:time_max, prices_matrix[,p], col = coul[p])
+  }
+  
+  # Sales
+  plot(1:time_max, sales_matrix[,1], col = coul[1], type = "l", ylim = c(min(sales_matrix)-1, max(sales_matrix)+1), xlim = c(1, time_max))
+  for(p in 2:Np){
+    lines(1:time_max, sales_matrix[,p], col = coul[p])
+  }
+  
+  # Incomes
+  income <- matrix(0L, time_max, Np)
+  for(p in 1:Np){
+    income[,p] = sales_matrix[,p] * prices_matrix[,p]
+  }
+  # print(income)
+  # print(length(income))
+  # print(1:time_max)
+  
+  plot(1:time_max, income[,1], col = coul[1], type = "l", ylim = c(min(income)-1, max(income)+1), xlim = c(1, time_max))
+  for(p in 2:Np){
+    lines(1:time_max, income[,p], col = coul[p])
+  }
+  
+  
   return(preferences)
+}
+
+product_choise <- function(population, preferences, products){
+  
+  consumers_ids <- which(V(population)$class == "C")
+  
+  for(c in consumers_ids){
+    p = runif(1)
+    
+    for(i in 1:Np){
+      if(p <= sum(preferences[1:i,c])){
+        V(population)[c]$product <- products[i]
+        break
+      }
+    }
+  }
+  
+  return(population)
 }
 
 update_preferences <- function(population, Np, Na, preferences, prices, producers_list, products){
@@ -127,6 +197,10 @@ update_preferences <- function(population, Np, Na, preferences, prices, producer
   consumers <- which(V(population)$class == "C")
   
   distance_coefficient <- 1;
+  
+  k_price <- 1;
+  k_voisins <- 1;
+  
   for(a in consumers){
     
     local_price <- rep(0L, Np)
@@ -146,22 +220,14 @@ update_preferences <- function(population, Np, Na, preferences, prices, producer
           sum_aux <- sum_aux + 1
         }
       }
-      message("Consumer ", a, "\nProduct ", p)
-      #message("Preferences Before ", preferences[p,a])
       
       sum_lp = sum(local_price)
-      #preferences[p,a] <- preferences[p,a] + (( 1/Np - local_price[p]/sum_lp ) + ( (Np-1)/Np - sum_aux/Nv ))
-      #preferences[p,a] <- preferences[p,a] + ( 1/Np - local_price[p]/sum_lp )# + ( (Np-1)/Np - sum_aux/Nv )
-      preferences[p,a] <- preferences[p,a] + ( 1/Np - sum_aux/Nv )
-      print(1/Np - sum_aux/Nv)
-      #message("Preferences After ", preferences[p,a])
-      #message("Np ", Np)
-      #message("Local Price ",local_price[p])
-      #message("Sum Local Price ", sum_local_price)
-      #message("Sum_aux ", sum_aux)
-      #message("Nv ", Nv)
-      #message("\n\n")
+      preferences[p,a] <- preferences[p,a] + k_price * (sum_lp - local_price[p])/sum_lp + k_voisins * sum_aux/Nv
+      
     }
+    
+    # normalisation
+    preferences[,a] <-  preferences[,a] / sum(preferences[,a])
   }
   
   
@@ -172,7 +238,7 @@ update_preferences <- function(population, Np, Na, preferences, prices, producer
 # Function that plot the population graph according by products bought
 plot_population <- function(population, products, layout_P){
   
-  coul  <- brewer.pal(length(products), "Set1")
+  coul  <- brewer.pal(length(products), "Paired")
   my_color <- coul[as.numeric(as.factor(V(population)$product))]
   my_shape <-  ifelse(V(population)$class == "C", "circle", "square")
 
