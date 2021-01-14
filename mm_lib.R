@@ -118,6 +118,7 @@ market_simulation <- function(population, products, preferences, prices, time_ma
     #print(preferences[,50])
     #print(V(population)[50]$product)
     #message("\n\n")
+    #•print(t)
     
     # Updating Product Preferences
     # (The one with most preference)
@@ -232,6 +233,90 @@ update_preferences <- function(population, Np, Na, preferences, prices, producer
   
   
   return(preferences)
+}
+
+add_links <- function(population, products, metric = 2, n_links = 10){
+  if(metric == 0){
+    property <- degree(population)# degree
+  }
+  else if(metric == 1){
+    property <- transitivity(population, type="local") # clustering coefficient
+  }
+  else if(metric == 2){
+    property <- closeness(population, normalized = TRUE) # closeness centrality
+  }
+  else{
+    return(population)
+  }
+  
+  Na <- length(V(population))
+  adj_list <- as_adj_list(population)
+  
+  # Discart the producers
+  producers_ids <- which(V(population)$class == "P")
+  property[producers_ids] <- -1
+  
+  
+  new_links <- 0
+  
+  for(i in 1:Na){
+    
+    id_max <- which.max(property)
+    
+    if(!is.element(id_max, adj_list[producers_ids])){
+      population <- add.edges(population, c(id_max,producers_ids[1]))
+      
+      new_links <- new_links + 1
+      property[id_max] <- -1
+      
+      if(new_links >= n_links){break}
+    }
+  }
+  
+  return(population)
+  
+}
+
+add_producers <- function(population, products, metric = 2, n_producers = 1){
+  if(metric == 0){
+    property <- degree(population)# degree
+  }
+  else if(metric == 1){
+    property <- transitivity(population, type="local") # clustering coefficient
+  }
+  else if(metric == 2){
+    property <- closeness(population, normalized = TRUE) # closeness centrality
+  }
+  else{
+    return(population)
+  }
+  
+  Na <- length(V(population))
+  adj_list <- as_adj_list(population)
+  
+  # Discart the producers
+  producers_ids <- which(V(population)$class == "P")
+  property[producers_ids] <- -1
+  
+  
+  new_producers <- 0
+  
+  for(i in 1:Na){
+    
+    id_max <- which.max(property)
+    
+    V(population)[id_max]$class == "P"
+    V(population)[id_max]$product == products[1]
+    
+    new_producers <- new_producers + 1
+    property[id_max] <- -1
+    
+    if(new_producers >= n_producers){break}
+    
+  }
+  
+  return(population)
+  
 }
 
 
