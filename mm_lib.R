@@ -44,7 +44,7 @@ init_preferences <- function(Np, Na){
 
 # Create the initiali random graph with Clients and Producers
 # Return the population graph
-init_population <- function(n, products){
+init_population <- function(n, products, nproducteur = 1){
   
   population <- generate_graph(3, n)
   Na <- length(V(population))
@@ -53,7 +53,6 @@ init_population <- function(n, products){
   
   
   Np <- length(products)
-  nproducteur = 1
   
   for(p in products){
     i <- 0
@@ -96,10 +95,12 @@ list_producers <- function(population, products){
   return(producers)
 }
 
-market_simulation <- function(population, products, preferences, prices, time_max){
+# Function that simulate the market flow
+# coefficient = c(k_price_variation, k_distance, k_price, k_neightbors)
+market_simulation <- function(population, products, preferences, prices, time_max, coefficients  = c(1, 1, 1, 1)){
   
   Np <- length(products)
-  k_prices <- 1
+  k_price_variation <- coefficients [1]
   
   prices_matrix <- matrix(0L, time_max, Np)
   prices_matrix[1:2,] <- prices
@@ -111,14 +112,7 @@ market_simulation <- function(population, products, preferences, prices, time_ma
   
   #print(preferences[,50])
   for (t in 2:time_max){
-    preferences <- update_preferences(population, Np, Na, preferences, prices, producers_list, products)
-    
-    # debug preferences function:
-    #message("PREFERENCES N 50 at t = : ", t, "\n")
-    #print(preferences[,50])
-    #print(V(population)[50]$product)
-    #message("\n\n")
-    #•print(t)
+    preferences <- update_preferences(population, Np, Na, preferences, prices, producers_list, products, k = coefficients [2:4])
     
     # Updating Product Preferences
     # (The one with most preference)
@@ -133,16 +127,20 @@ market_simulation <- function(population, products, preferences, prices, time_ma
     
     # Update prices
     for(p in 1:Np){
-      prices[p] <- prices[p] + k_prices * (sales_matrix[t-1]*prices_matrix[t-1] - sales_matrix[t]*prices_matrix[t]) / (sales_matrix[t]*prices_matrix[t])
+      prices[p] <- prices[p] - k_price_variation * (sales_matrix[t-1]*prices_matrix[t-1] - sales_matrix[t]*prices_matrix[t]) / (sales_matrix[t]*prices_matrix[t])
     }
     if(t < time_max){
       prices_matrix[t+1,] <- prices
     }
-    #message("Prices: ")
-    #print(prices)
-    
   }
   
+  plot_market(time_max, prices_matrix, sales_matrix)
+  
+  return(preferences)
+}
+
+# Function that plot the simulation statistics
+plot_market <- function(time_max, prices_matrix, sales_matrix){
   coul  <- brewer.pal(Np, "Paired")
   
   # Prices
@@ -171,10 +169,22 @@ market_simulation <- function(population, products, preferences, prices, time_ma
     lines(1:time_max, income[,p], col = coul[p])
   }
   
-  
-  return(preferences)
+  for(p in 1:Np){
+    cat("Product: ")
+    print(products[p])
+    
+    cat("Total Income: ")
+    print(sum(income[,p]))
+    
+    cat("Total Sales: ")
+    print(sum(sales_matrix[,p]))
+    
+    cat("Avg Price: ")
+    print(mean(prices_matrix[,p]))
+  }
 }
 
+# Function that assigns randomly a product each iteration, according to preferences
 product_choise <- function(population, preferences, products){
   
   consumers_ids <- which(V(population)$class == "C")
@@ -193,14 +203,14 @@ product_choise <- function(population, preferences, products){
   return(population)
 }
 
-update_preferences <- function(population, Np, Na, preferences, prices, producers_list, products){
+# Function that update the consumer preferences according to prices and sales
+update_preferences <- function(population, Np, Na, preferences, prices, producers_list, products, k = c(1, 1, 1)){
   adjacent_list <- as_adj_list(population)
   consumers <- which(V(population)$class == "C")
   
-  distance_coefficient <- 1;
-  
-  k_price <- 1;
-  k_voisins <- 1;
+  k_distance <- k[1];
+  k_price <- k[2];
+  k_neighbors <- k[3];
   
   for(a in consumers){
     
@@ -208,7 +218,7 @@ update_preferences <- function(population, Np, Na, preferences, prices, producer
 
     for(p in 1:Np){
       d <- distances(population, v = a)[1,unlist(producers[[p]])]
-      local_price[p] <- prices[p] + d*distance_coefficient
+      local_price[p] <- prices[p] + d * k_distance
     }
     
     Nv <- length(adjacent_list[[a]])
@@ -223,7 +233,7 @@ update_preferences <- function(population, Np, Na, preferences, prices, producer
       }
       
       sum_lp = sum(local_price)
-      preferences[p,a] <- preferences[p,a] + k_price * (sum_lp - local_price[p])/sum_lp + k_voisins * sum_aux/Nv
+      preferences[p,a] <- preferences[p,a] + k_price * (sum_lp - local_price[p])/sum_lp + k_neighbors * sum_aux/Nv
       
     }
     
@@ -235,6 +245,7 @@ update_preferences <- function(population, Np, Na, preferences, prices, producer
   return(preferences)
 }
 
+# Function that modify the graph edges in favor of the first product
 add_links <- function(population, products, metric = 2, n_links = 10){
   if(metric == 0){
     property <- degree(population)# degree
@@ -277,6 +288,7 @@ add_links <- function(population, products, metric = 2, n_links = 10){
   
 }
 
+# Function that adds producers in favor of product 1
 add_producers <- function(population, products, metric = 2, n_producers = 1){
   if(metric == 0){
     property <- degree(population)# degree
@@ -327,7 +339,7 @@ plot_population <- function(population, products, layout_P){
   my_color <- coul[as.numeric(as.factor(V(population)$product))]
   my_shape <-  ifelse(V(population)$class == "C", "circle", "square")
 
-  plot(population, vertex.shape = my_shape, vertex.color=my_color, layout = layout_P)
+  plot(population, vertex.shape = my_shape, vertex.color=my_color, vertex.size = 5, vertex.label.cex = 0.6, layout = layout_P)
   legend("bottomleft", legend=levels(as.factor(products))  , col = coul , bty = "n", pch=20 , pt.cex = 3, cex = 1.5, text.col=coul , horiz = FALSE, inset = c(-0.1, -0.1))
   
 }
